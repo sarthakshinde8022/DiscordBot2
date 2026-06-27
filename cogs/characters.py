@@ -3,14 +3,13 @@ from discord.ext import commands
 import random
 import config
 import database as db
-from cogs.views import SummonAgainView
 
 CHARS_PER_PAGE   = 15
 GALLERY_PER_PAGE = 9
 
 def get_player(user_id):
     conn = db.get_conn()
-    p = conn.execute("SELECT * FROM players WHERE user_id=%s", (str(user_id),)).fetchone()
+    p = conn.execute("SELECT * FROM players WHERE user_id=?", (str(user_id),)).fetchone()
     conn.close()
     return p
 
@@ -31,7 +30,7 @@ def do_summon(banner_key="1"):
     # Pick character of that rarity
     conn = db.get_conn()
     chars = conn.execute(
-        "SELECT * FROM characters WHERE rarity=%s", (chosen_rarity,)
+        "SELECT * FROM characters WHERE rarity=?", (chosen_rarity,)
     ).fetchall()
     conn.close()
 
@@ -66,15 +65,15 @@ class Characters(commands.Cog):
 
         conn = db.get_conn()
         conn.execute(
-            "UPDATE players SET hon = hon - %s WHERE user_id=%s",
+            "UPDATE players SET hon = hon - ? WHERE user_id=?",
             (cost, str(ctx.author.id))
         )
         conn.execute(
-            "INSERT INTO player_characters (user_id, char_id) VALUES (%s,%s)",
+            "INSERT INTO player_characters (user_id, char_id) VALUES (?,?)",
             (str(ctx.author.id), char["id"])
         )
         conn.commit()
-        new_hon = conn.execute("SELECT hon FROM players WHERE user_id=%s", (str(ctx.author.id),)).fetchone()["hon"]
+        new_hon = conn.execute("SELECT hon FROM players WHERE user_id=?", (str(ctx.author.id),)).fetchone()["hon"]
         conn.close()
 
         r_emoji = config.RARITY_EMOJI.get(char["rarity"], "")
@@ -93,9 +92,8 @@ class Characters(commands.Cog):
             ),
             color=color
         )
-        embed.set_footer(text=f"Cost: {cost} Hon • Use jay!multi for 10x summon")
-        view = SummonAgainView(ctx.author.id, banner)
-        await ctx.send(embed=embed, view=view)
+        embed.set_footer(text=f"Cost: {cost} Hon • Use !multi for 10x summon")
+        await ctx.send(embed=embed)
 
     # ── !multi ────────────────────────────────────────────────────────
     @commands.command(name="multi")
@@ -115,14 +113,14 @@ class Characters(commands.Cog):
         results = [r for r in results if r]
 
         conn = db.get_conn()
-        conn.execute("UPDATE players SET hon=hon-%s WHERE user_id=%s", (cost, str(ctx.author.id)))
+        conn.execute("UPDATE players SET hon=hon-? WHERE user_id=?", (cost, str(ctx.author.id)))
         for char in results:
             conn.execute(
-                "INSERT INTO player_characters (user_id, char_id) VALUES (%s,%s)",
+                "INSERT INTO player_characters (user_id, char_id) VALUES (?,?)",
                 (str(ctx.author.id), char["id"])
             )
         conn.commit()
-        new_hon = conn.execute("SELECT hon FROM players WHERE user_id=%s", (str(ctx.author.id),)).fetchone()["hon"]
+        new_hon = conn.execute("SELECT hon FROM players WHERE user_id=?", (str(ctx.author.id),)).fetchone()["hon"]
         conn.close()
 
         b = config.BANNERS.get(banner, config.BANNERS["1"])
@@ -158,11 +156,13 @@ class Characters(commands.Cog):
     # ── !chars ────────────────────────────────────────────────────────
     @commands.command(name="chars", aliases=["characters", "inventory"])
     async def chars(self, ctx, member: discord.Member = None, page: int = 1):
-        """View your warrior inventory. Usage: !chars [page]"""
+        """View your warrior inventory. Usage: jay!chars [page]"""
         target = member or ctx.author
+        if not member:
+            db.ensure_user(str(target.id), target.name)
         player = get_player(str(target.id))
         if not player:
-            await ctx.send("❌ Use `jay!start` first!")
+            await ctx.send(f"❌ {target.name} hasn't started yet.")
             return
 
         conn = db.get_conn()
@@ -186,29 +186,41 @@ class Characters(commands.Cog):
         start = (page - 1) * CHARS_PER_PAGE
         chunk = rows[start:start + CHARS_PER_PAGE]
 
-        # Build 3-column grid like DBOV
-        lines = []
-        for i in range(0, len(chunk), 3):
-            row_items = chunk[i:i+3]
-            parts = []
-            for pc in row_items:
-                r  = config.RARITY_EMOJI.get(pc["rarity"], "")
-                e  = config.ELEMENT_EMOJI.get(pc["element"], "")
-                fav = "⭐" if pc["is_favorite"] else ""
-                parts.append(f"**(ID:{pc['id']})** {r} {pc['name']} {e}{fav}\nLv:{pc['level']} | Tier:x{pc['tier']}")
-            lines.append("   ".join(parts))
-
         embed = discord.Embed(
             title=f"⚔️ {target.name}'s Warriors",
-            description="**Character Inventory**\n\n" + "\n\n".join(lines),
+            description="**Character Inventory**",
             color=config.COLOR_MAIN
         )
+
+        # 3-column grid using inline fields — same style as DBOV
+        for pc in chunk:
+            r   = config.RARITY_EMOJI.get(pc["rarity"], "")
+            e   = config.ELEMENT_EMOJI.get(pc["element"], "")
+            fav = " ⭐" if pc["is_favorite"] else ""
+            embed.add_field(
+                name=f"(ID: {pc['id']}) {r} {pc['name']} {e}{fav}",
+                value=f"Level: {pc['level']} | Tier: x{pc['tier']}",
+                inline=True
+            )
+
+        # Pad to multiple of 3 so grid stays aligned
+        remainder = len(chunk) % 3
+        if remainder == 1:
+            embed.add_field(name="\u200b", value="\u200b", inline=True)
+            embed.add_field(name="\u200b", value="\u200b", inline=True)
+        elif remainder == 2:
+            embed.add_field(name="\u200b", value="\u200b", inline=True)
+
         embed.add_field(
             name="——Helpful Commands——",
-            value="`!select <ID>` — Select a warrior\n`!info <ID>` — View warrior info\n`!fav <ID>` — Favourite a warrior",
+            value=(
+                "`jay!select <ID>` — Select a warrior\n"
+                "`jay!info <ID>` — View warrior info\n"
+                "`jay!fav <ID>` — Favourite a warrior"
+            ),
             inline=False
         )
-        embed.set_footer(text=f"Page [{page}/{total_pages}] • Total {total} warriors • !chars [page]")
+        embed.set_footer(text=f"Page [{page}/{total_pages}] • Total {total} warriors • jay!chars [page]")
         await ctx.send(embed=embed)
 
     # ── !gallery ──────────────────────────────────────────────────────
@@ -256,7 +268,7 @@ class Characters(commands.Cog):
                       ch.base_def, ch.description
                FROM player_characters pc
                JOIN characters ch ON pc.char_id = ch.id
-               WHERE pc.id = %s AND pc.user_id = %s""",
+               WHERE pc.id = ? AND pc.user_id = ?""",
             (char_id, str(ctx.author.id))
         ).fetchone()
         conn.close()
@@ -300,7 +312,7 @@ class Characters(commands.Cog):
 
         conn = db.get_conn()
         pc = conn.execute(
-            "SELECT pc.id, ch.name FROM player_characters pc JOIN characters ch ON pc.char_id=ch.id WHERE pc.id=%s AND pc.user_id=%s",
+            "SELECT pc.id, ch.name FROM player_characters pc JOIN characters ch ON pc.char_id=ch.id WHERE pc.id=? AND pc.user_id=?",
             (char_id, str(ctx.author.id))
         ).fetchone()
 
@@ -309,7 +321,7 @@ class Characters(commands.Cog):
             await ctx.send(f"❌ No warrior with ID `{char_id}` in your inventory.")
             return
 
-        conn.execute("UPDATE players SET selected_char=%s WHERE user_id=%s", (char_id, str(ctx.author.id)))
+        conn.execute("UPDATE players SET selected_char=? WHERE user_id=?", (char_id, str(ctx.author.id)))
         conn.commit()
         conn.close()
 
@@ -325,7 +337,7 @@ class Characters(commands.Cog):
 
         conn = db.get_conn()
         pc = conn.execute(
-            "SELECT pc.id, pc.is_favorite, ch.name FROM player_characters pc JOIN characters ch ON pc.char_id=ch.id WHERE pc.id=%s AND pc.user_id=%s",
+            "SELECT pc.id, pc.is_favorite, ch.name FROM player_characters pc JOIN characters ch ON pc.char_id=ch.id WHERE pc.id=? AND pc.user_id=?",
             (char_id, str(ctx.author.id))
         ).fetchone()
 
@@ -335,7 +347,7 @@ class Characters(commands.Cog):
             return
 
         new_fav = 0 if pc["is_favorite"] else 1
-        conn.execute("UPDATE player_characters SET is_favorite=%s WHERE id=%s", (new_fav, char_id))
+        conn.execute("UPDATE player_characters SET is_favorite=? WHERE id=?", (new_fav, char_id))
         conn.commit()
         conn.close()
 
@@ -350,7 +362,7 @@ class Characters(commands.Cog):
         rows = conn.execute(
             """SELECT pc.id, pc.level, pc.tier, ch.name, ch.rarity, ch.element
                FROM player_characters pc JOIN characters ch ON pc.char_id=ch.id
-               WHERE pc.user_id=%s AND pc.is_favorite=1""",
+               WHERE pc.user_id=? AND pc.is_favorite=1""",
             (str(ctx.author.id),)
         ).fetchall()
         conn.close()
