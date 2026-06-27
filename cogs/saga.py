@@ -4,6 +4,7 @@ import asyncio
 import random
 import config
 import database as db
+from cogs.views import MoveView
 
 def get_player(user_id):
     conn = db.get_conn()
@@ -263,14 +264,11 @@ class Saga(commands.Cog):
                         value=f"`{bar}` Pow:{mv['power']}",
                         inline=True
                     )
-                battle_embed.set_footer(text="Type 1, 2, 3, or 4 to attack • 20 seconds")
-                await ctx.send(embed=battle_embed)
-
-                # Wait for move
-                try:
-                    msg = await self.bot.wait_for("message", check=move_check, timeout=20.0)
-                    move_idx = int(msg.content) - 1
-                except asyncio.TimeoutError:
+                battle_embed.set_footer(text="Click a move button below • 25 seconds")
+                view = MoveView(fighter, ctx.author.id)
+                await ctx.send(embed=battle_embed, view=view)
+                await view.wait()
+                if view.chosen_move is None:
                     self.active_battles.pop(channel_id, None)
                     await ctx.send("⏰ **Battle timed out!** You took too long to choose a move.")
                     return
