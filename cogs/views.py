@@ -94,20 +94,22 @@ class SummonAgainView(discord.ui.View):
         if interaction.user.id != self.author_id:
             await interaction.response.send_message("❌ This isn't your summon!", ephemeral=True)
             return
-        button.disabled = True
-        await interaction.response.edit_message(view=self)
-        ctx_like = interaction.channel
-        await interaction.followup.send(
-            f"Use `jay!summon {self.banner}` to summon again!", ephemeral=True
-        )
-        self.stop()
+        await interaction.response.defer()
+        ctx = await interaction.client.get_context(interaction.message)
+        ctx.author = interaction.user
+        ctx.channel = interaction.channel
+        await interaction.client.get_cog("Characters").summon(ctx, self.banner)
 
     @discord.ui.button(label="View Warriors", style=discord.ButtonStyle.secondary, emoji="⚔️")
     async def view_chars(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.author_id:
             await interaction.response.send_message("❌ This isn't your summon!", ephemeral=True)
             return
-        await interaction.response.send_message("Use `jay!chars` to view your warriors!", ephemeral=True)
+        await interaction.response.defer()
+        ctx = await interaction.client.get_context(interaction.message)
+        ctx.author = interaction.user
+        ctx.channel = interaction.channel
+        await interaction.client.get_cog("Characters").chars(ctx)
 
 # ── Pagination View ───────────────────────────────────────────────────
 class PaginationView(discord.ui.View):
@@ -196,21 +198,33 @@ class ProfileView(discord.ui.View):
         if interaction.user.id != self.author_id:
             await interaction.response.send_message("❌ This isn't your profile!", ephemeral=True)
             return
-        await interaction.response.send_message("Use `jay!daily` to claim your daily reward!", ephemeral=True)
+        await interaction.response.defer()
+        ctx = await interaction.client.get_context(interaction.message)
+        ctx.author = interaction.user
+        ctx.channel = interaction.channel
+        await interaction.client.get_cog("General").daily(ctx)
 
     @discord.ui.button(label="Warriors", style=discord.ButtonStyle.primary, emoji="⚔️")
     async def warriors(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.author_id:
             await interaction.response.send_message("❌ This isn't your profile!", ephemeral=True)
             return
-        await interaction.response.send_message("Use `jay!chars` to view your warriors!", ephemeral=True)
+        await interaction.response.defer()
+        ctx = await interaction.client.get_context(interaction.message)
+        ctx.author = interaction.user
+        ctx.channel = interaction.channel
+        await interaction.client.get_cog("Characters").chars(ctx)
 
     @discord.ui.button(label="Summon", style=discord.ButtonStyle.secondary, emoji="🏹")
     async def summon(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.author_id:
             await interaction.response.send_message("❌ This isn't your profile!", ephemeral=True)
             return
-        await interaction.response.send_message("Use `jay!summon` to summon a warrior!", ephemeral=True)
+        await interaction.response.defer()
+        ctx = await interaction.client.get_context(interaction.message)
+        ctx.author = interaction.user
+        ctx.channel = interaction.channel
+        await interaction.client.get_cog("Characters").summon(ctx)
 
 # ── Interactive Battle Engine ─────────────────────────────────────────
 async def run_interactive_battle(ctx, fighter, enemy_name, enemy_hp, enemy_atk, enemy_def, enemy_element, on_win, on_lose):
@@ -220,7 +234,6 @@ async def run_interactive_battle(ctx, fighter, enemy_name, enemy_hp, enemy_atk, 
     max_ehp   = enemy_hp
     total_dmg = 0
     turn      = 0
-    won       = False
 
     fr = config.RARITY_EMOJI.get(fighter["rarity"], "")
     fe = config.ELEMENT_EMOJI.get(fighter["element"], "")
@@ -229,7 +242,6 @@ async def run_interactive_battle(ctx, fighter, enemy_name, enemy_hp, enemy_atk, 
     while player_hp > 0 and enemy_hp > 0 and turn < 30:
         turn += 1
 
-        # Build battle embed
         battle_embed = discord.Embed(
             title=f"⚔️ Turn {turn} — Choose your move!",
             color=config.COLOR_MAIN
