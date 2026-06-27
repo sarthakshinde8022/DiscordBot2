@@ -3,6 +3,7 @@ from discord.ext import commands
 from datetime import datetime, timedelta
 import database as db
 import config
+from cogs.views import ProfileView
 
 def get_player(user_id, username=None):
     conn = db.get_conn()
@@ -120,8 +121,9 @@ class General(commands.Cog):
         if selected:
             r = config.RARITY_EMOJI.get(selected["rarity"], "")
             embed.add_field(name="🎯 Selected", value=f"{r} {selected['name']}", inline=True)
-        embed.set_footer(text="Swarajya Bot • Use !chars to view warriors")
-        await ctx.send(embed=embed)
+        embed.set_footer(text="Swarajya Bot • Use jay!chars to view warriors")
+        view = ProfileView(ctx.author.id)
+        await ctx.send(embed=embed, view=view)
 
     # ── !bal ─────────────────────────────────────────────────────────
     @commands.command(name="bal", aliases=["balance", "zeni"])
