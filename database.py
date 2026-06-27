@@ -1,11 +1,11 @@
 import os
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import psycopg
+from psycopg.rows import dict_row
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 def get_conn():
-    conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+    conn = psycopg.connect(DATABASE_URL, row_factory=dict_row)
     return conn
 
 def ensure_user(user_id, username=None):
