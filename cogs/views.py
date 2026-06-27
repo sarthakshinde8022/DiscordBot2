@@ -49,6 +49,57 @@ def get_fighter(user_id):
         ]
     }
 
+# ── Helper: build chars embed directly ───────────────────────────────
+def build_chars_embed(user_id, username, page=1):
+    CHARS_PER_PAGE = 15
+    conn = db.get_conn()
+    rows = conn.execute(
+        """SELECT pc.id, pc.level, pc.tier, pc.is_favorite, ch.name, ch.rarity, ch.element
+           FROM player_characters pc
+           JOIN characters ch ON pc.char_id = ch.id
+           WHERE pc.user_id = %s
+           ORDER BY ch.rarity DESC, pc.level DESC""",
+        (str(user_id),)
+    ).fetchall()
+    conn.close()
+
+    if not rows:
+        return None, 0, 0
+
+    total = len(rows)
+    total_pages = max(1, (total + CHARS_PER_PAGE - 1) // CHARS_PER_PAGE)
+    page = max(1, min(page, total_pages))
+    chunk = rows[(page - 1) * CHARS_PER_PAGE : page * CHARS_PER_PAGE]
+
+    embed = discord.Embed(
+        title=f"⚔️ {username}'s Warriors",
+        description="**Character Inventory**",
+        color=config.COLOR_MAIN
+    )
+    for pc in chunk:
+        r   = config.RARITY_EMOJI.get(pc["rarity"], "")
+        e   = config.ELEMENT_EMOJI.get(pc["element"], "")
+        fav = " ⭐" if pc["is_favorite"] else ""
+        embed.add_field(
+            name=f"(ID: {pc['id']}) {r} {pc['name']} {e}{fav}",
+            value=f"Level: {pc['level']} | Tier: x{pc['tier']}",
+            inline=True
+        )
+    remainder = len(chunk) % 3
+    if remainder == 1:
+        embed.add_field(name="\u200b", value="\u200b", inline=True)
+        embed.add_field(name="\u200b", value="\u200b", inline=True)
+    elif remainder == 2:
+        embed.add_field(name="\u200b", value="\u200b", inline=True)
+
+    embed.add_field(
+        name="——Helpful Commands——",
+        value="`jay!select <ID>` — Select a warrior\n`jay!info <ID>` — View warrior info\n`jay!fav <ID>` — Favourite a warrior",
+        inline=False
+    )
+    embed.set_footer(text=f"Page [{page}/{total_pages}] • Total {total} warriors • jay!chars [page]")
+    return embed, total, total_pages
+
 # ── Move Selection View ───────────────────────────────────────────────
 class MoveView(discord.ui.View):
     def __init__(self, fighter, author_id, timeout=25):
@@ -57,7 +108,6 @@ class MoveView(discord.ui.View):
         self.author_id   = author_id
         self.fighter     = fighter
         for i, mv in enumerate(fighter["moves"]):
-            bar   = power_bar(mv["power"])
             label = f"{mv['name']} ({mv['power']})"[:80]
             btn   = discord.ui.Button(
                 label=label, style=discord.ButtonStyle.primary,
@@ -95,21 +145,19 @@ class SummonAgainView(discord.ui.View):
             await interaction.response.send_message("❌ This isn't your summon!", ephemeral=True)
             return
         await interaction.response.defer()
-        ctx = await interaction.client.get_context(interaction.message)
-        ctx.author = interaction.user
-        ctx.channel = interaction.channel
-        await interaction.client.get_cog("Characters").summon(ctx, self.banner)
+        # Trigger summon via bot command
+        await interaction.channel.send(f"jay!summon {self.banner}")
 
     @discord.ui.button(label="View Warriors", style=discord.ButtonStyle.secondary, emoji="⚔️")
     async def view_chars(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.author_id:
             await interaction.response.send_message("❌ This isn't your summon!", ephemeral=True)
             return
-        await interaction.response.defer()
-        ctx = await interaction.client.get_context(interaction.message)
-        ctx.author = interaction.user
-        ctx.channel = interaction.channel
-        await interaction.client.get_cog("Characters").chars(ctx)
+        embed, total, _ = build_chars_embed(interaction.user.id, interaction.user.name)
+        if not total:
+            await interaction.response.send_message("You have no warriors yet! Use `jay!summon`.", ephemeral=True)
+            return
+        await interaction.response.send_message(embed=embed)
 
 # ── Pagination View ───────────────────────────────────────────────────
 class PaginationView(discord.ui.View):
@@ -199,21 +247,18 @@ class ProfileView(discord.ui.View):
             await interaction.response.send_message("❌ This isn't your profile!", ephemeral=True)
             return
         await interaction.response.defer()
-        ctx = await interaction.client.get_context(interaction.message)
-        ctx.author = interaction.user
-        ctx.channel = interaction.channel
-        await interaction.client.get_cog("General").daily(ctx)
+        await interaction.channel.send(f"jay!daily")
 
     @discord.ui.button(label="Warriors", style=discord.ButtonStyle.primary, emoji="⚔️")
     async def warriors(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.author_id:
             await interaction.response.send_message("❌ This isn't your profile!", ephemeral=True)
             return
-        await interaction.response.defer()
-        ctx = await interaction.client.get_context(interaction.message)
-        ctx.author = interaction.user
-        ctx.channel = interaction.channel
-        await interaction.client.get_cog("Characters").chars(ctx)
+        embed, total, _ = build_chars_embed(interaction.user.id, interaction.user.name)
+        if not total:
+            await interaction.response.send_message("You have no warriors yet! Use `jay!summon`.", ephemeral=True)
+            return
+        await interaction.response.send_message(embed=embed)
 
     @discord.ui.button(label="Summon", style=discord.ButtonStyle.secondary, emoji="🏹")
     async def summon(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -221,10 +266,7 @@ class ProfileView(discord.ui.View):
             await interaction.response.send_message("❌ This isn't your profile!", ephemeral=True)
             return
         await interaction.response.defer()
-        ctx = await interaction.client.get_context(interaction.message)
-        ctx.author = interaction.user
-        ctx.channel = interaction.channel
-        await interaction.client.get_cog("Characters").summon(ctx)
+        await interaction.channel.send("jay!summon")
 
 # ── Interactive Battle Engine ─────────────────────────────────────────
 async def run_interactive_battle(ctx, fighter, enemy_name, enemy_hp, enemy_atk, enemy_def, enemy_element, on_win, on_lose):
