@@ -8,7 +8,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?style=for-the-badge&logo=python)
 ![discord.py](https://img.shields.io/badge/discord.py-2.3+-5865F2?style=for-the-badge&logo=discord)
-![SQLite](https://img.shields.io/badge/SQLite-Database-green?style=for-the-badge&logo=sqlite)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-blue?style=for-the-badge&logo=postgresql)
 ![License](https://img.shields.io/badge/License-MIT-orange?style=for-the-badge)
 
 </div>
@@ -17,7 +17,7 @@
 
 ## 🏰 About
 
-**JayBot** is a feature-rich Discord RPG bot inspired by Dragon Ball OV, themed around the **Maratha Empire**. Summon legendary Maratha warriors like Chhatrapati Shivaji Maharaj and Bajirao I, fight Mughal bosses, complete historical story sagas, and climb the Gadkille Tower to prove your worth!
+**JayBot** is a feature-rich Discord RPG bot inspired by Dragon Ball OV, themed around the **Maratha Empire**. Summon legendary Maratha warriors like Chhatrapati Shivaji Maharaj and Bajirao I, fight Mughal bosses, complete historical story sagas, climb the Gadkille Tower, buy weapons and armour, raise War Animals, build clans, and trade on the player market!
 
 ---
 
@@ -59,6 +59,29 @@
 - Each character has 4 unique named moves
 - Info, select, favourite system
 - Full warrior gallery
+
+### 🛡️ Items & Equipment (Phase 3b)
+- Buy weapons, armour, and helmets from the **Swarajya Armoury**
+- Equip items to warriors to boost ATK, DEF, and HP
+- Rarity tiers: Common → Legendary
+
+### 🐾 War Animals / Pets (Phase 3b)
+- Buy Small, Medium, or Large eggs from the egg shop
+- Eggs hatch over time (2–6 hours)
+- Taming mini-game on hatch
+- Activate a War Animal to boost your stats in battle
+
+### 🏰 Clans (Phase 4)
+- Create your own clan for 1000 🪙 Hon
+- Join clans by tag, donate to the clan bank
+- Clan rankings, levels, and win/loss records
+- Leader can disband the clan
+
+### 🏪 Market & Trading (Phase 4)
+- List warriors and items on the **Swarajya Market**
+- Buy listings from other players instantly
+- Remove your own listings anytime
+- Direct Hon trades between players with accept/decline
 
 ---
 
@@ -118,6 +141,49 @@
 | `jay!tc 4` | Extreme — Senapati (rewards 2x 🗝️) |
 | `jay!keys` | Check Boss Keys |
 
+### 🛡️ Items & Shop
+| Command | Description |
+|---|---|
+| `jay!shop` | Browse the Swarajya Armoury |
+| `jay!shop 2` | Browse the War Animal Egg Shop |
+| `jay!buyitem <ID>` | Purchase an item |
+| `jay!items [page]` | Your item inventory |
+| `jay!iinfo <ID>` | Item details & stats |
+| `jay!iequip <charID> <itemID>` | Equip item to a warrior |
+| `jay!iunequip <itemID>` | Unequip an item |
+
+### 🐾 War Animals
+| Command | Description |
+|---|---|
+| `jay!buyegg small/medium/large` | Buy an egg |
+| `jay!eggs` | View your incubating eggs |
+| `jay!hatch` | Hatch a ready egg (mini-game!) |
+| `jay!pets` | View your War Animals |
+| `jay!petequip <ID>` | Activate a War Animal |
+
+### 🏰 Clans
+| Command | Description |
+|---|---|
+| `jay!clancreate <TAG> <Name>` | Create a clan (costs 1000 🪙) |
+| `jay!claninfo` | View your clan info |
+| `jay!claninfo <name/tag>` | View any clan's info |
+| `jay!clanjoin <TAG>` | Join a clan by tag |
+| `jay!clanleave` | Leave your clan |
+| `jay!clandisband` | Disband your clan (leader only) |
+| `jay!clandonate <amount>` | Donate Hon to clan bank |
+| `jay!clanlist` | View all clan rankings |
+
+### 🏪 Market & Trading
+| Command | Description |
+|---|---|
+| `jay!market [page]` | Browse the player market |
+| `jay!mlist char <ID> <price>` | List a warrior for sale |
+| `jay!mlist item <ID> <price>` | List an item for sale |
+| `jay!mbuy <listing ID>` | Buy a market listing |
+| `jay!mremove <listing ID>` | Remove your listing |
+| `jay!mylistings` | View your active listings |
+| `jay!trade @user <hon>` | Send a Hon trade offer |
+
 ---
 
 ## 🏛️ Maratha Warriors
@@ -146,8 +212,9 @@
 ## 🚀 Setup
 
 ### Prerequisites
-- Python 3.10+
+- Python 3.12+
 - A Discord Bot Token ([discord.com/developers](https://discord.com/developers/applications))
+- A PostgreSQL database (e.g. Railway, Supabase, Neon)
 
 ### Installation
 
@@ -161,6 +228,7 @@ pip install -r requirements.txt
 
 # 3. Create .env file
 echo "DISCORD_TOKEN=your_token_here" > .env
+echo "DATABASE_URL=postgresql://user:pass@host:5432/dbname" >> .env
 
 # 4. Run the bot
 python main.py
@@ -182,7 +250,7 @@ Enable **Message Content Intent** in the Discord Developer Portal → Bot tab.
 ```
 JayBot/
 ├── main.py          # Bot entry point, help command
-├── database.py      # SQLite setup, all seeds
+├── database.py      # PostgreSQL setup, all seeds
 ├── config.py        # Rarities, rates, economy constants
 ├── requirements.txt
 └── cogs/
@@ -190,7 +258,10 @@ JayBot/
     ├── characters.py # summon, chars, gallery, info, select, fav
     ├── battle.py    # fight, boss, stats, moves
     ├── saga.py      # saga, mission (interactive)
-    └── tower.py     # tower challenge, boss keys
+    ├── tower.py     # tower challenge, boss keys
+    ├── items.py     # shop, items, eggs, pets, war animals
+    ├── clans.py     # clan create, join, donate, rankings
+    └── market.py    # market, buy, sell, trade
 ```
 
 ---
@@ -200,8 +271,8 @@ JayBot/
 - [x] Phase 1 — Profile, Economy, Gacha
 - [x] Phase 2 — PvP, Boss Battles
 - [x] Phase 3a — Sagas, Missions, Tower, Boss Keys
-- [ ] Phase 3b — Items & Equipment, War Animals (Pets)
-- [ ] Phase 4 — Clans, Market, Trading
+- [x] Phase 3b — Items & Equipment, War Animals (Pets)
+- [x] Phase 4 — Clans, Market, Trading
 - [ ] Phase 5 — Fusion, Awakening, Soul Boost
 
 ---
