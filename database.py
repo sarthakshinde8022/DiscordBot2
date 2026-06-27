@@ -5,7 +5,10 @@ from psycopg.rows import dict_row
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 def get_conn():
-    conn = psycopg.connect(DATABASE_URL, row_factory=dict_row)
+    import os
+    url = os.getenv("DATABASE_URL")
+    print(f"DEBUG: DATABASE_URL = {url}")
+    conn = psycopg.connect(url, row_factory=dict_row)
     return conn
 
 def ensure_user(user_id, username=None):
