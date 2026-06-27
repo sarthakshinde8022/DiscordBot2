@@ -126,7 +126,11 @@ class Battle(commands.Cog):
             ),
             color=config.COLOR_MAIN
         )
-        await ctx.send(embed=embed)
+        view = BattleAcceptView(ctx.author.id, opponent.id)
+msg = await ctx.send(embed=embed, view=view)
+await view.wait()
+if not view.accepted:
+    return await ctx.send(f"🛡️ {opponent.mention} declined.")
 
         def check(m):
             return m.author.id == opponent.id and m.channel == ctx.channel and m.content.lower() in ["accept","decline"]
