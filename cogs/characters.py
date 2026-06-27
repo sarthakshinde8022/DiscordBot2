@@ -3,6 +3,7 @@ from discord.ext import commands
 import random
 import config
 import database as db
+from cogs.views import SummonAgainView
 
 CHARS_PER_PAGE   = 15
 GALLERY_PER_PAGE = 9
@@ -92,8 +93,9 @@ class Characters(commands.Cog):
             ),
             color=color
         )
-        embed.set_footer(text=f"Cost: {cost} Hon • Use !multi for 10x summon")
-        await ctx.send(embed=embed)
+        embed.set_footer(text=f"Cost: {cost} Hon • Use jay!multi for 10x summon")
+        view = SummonAgainView(ctx.author.id, banner)
+        await ctx.send(embed=embed, view=view)
 
     # ── !multi ────────────────────────────────────────────────────────
     @commands.command(name="multi")
