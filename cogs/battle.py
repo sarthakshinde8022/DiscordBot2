@@ -4,6 +4,7 @@ import random
 import asyncio
 import config
 import database as db
+from cogs.views import BattleAcceptView, run_interactive_battle
 
 def get_player(user_id):
     conn = db.get_conn()
