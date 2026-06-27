@@ -4,7 +4,7 @@ import random
 import asyncio
 import config
 import database as db
-from cogs.views import BattleAcceptView, run_interactive_battle
+from cogs.views import BattleAcceptView
 
 def get_player(user_id):
     conn = db.get_conn()
@@ -39,7 +39,7 @@ def get_fighter(user_id):
 
 def ensure_battle_stats(user_id):
     conn = db.get_conn()
-    conn.execute("INSERT INTO battle_stats (user_id) VALUES (%s) ON CONFLICT (user_id) DO NOTHING", (str(user_id),))
+    conn.execute("INSERT INTO battle_stats (user_id) VALUES (%s)", (str(user_id),))
     conn.commit()
     conn.close()
 
@@ -126,11 +126,7 @@ class Battle(commands.Cog):
             ),
             color=config.COLOR_MAIN
         )
-        view = BattleAcceptView(ctx.author.id, opponent.id)
-msg = await ctx.send(embed=embed, view=view)
-await view.wait()
-if not view.accepted:
-    return await ctx.send(f"🛡️ {opponent.mention} declined.")
+        await ctx.send(embed=embed)
 
         def check(m):
             return m.author.id == opponent.id and m.channel == ctx.channel and m.content.lower() in ["accept","decline"]
