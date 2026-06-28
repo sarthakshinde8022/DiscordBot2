@@ -45,7 +45,7 @@ class Items(commands.Cog):
             """SELECT pi.id, pi.level, pi.is_equipped, pi.is_favorite,
                       i.name, i.type, i.rarity, i.atk_bonus, i.def_bonus, i.hp_bonus
                FROM player_items pi JOIN items i ON pi.item_id = i.id
-               WHERE pi.user_id = ?
+               WHERE pi.user_id = %s
                ORDER BY i.rarity DESC, i.type""",
             (str(ctx.author.id),)
         ).fetchall()
@@ -90,7 +90,7 @@ class Items(commands.Cog):
         row = conn.execute(
             """SELECT pi.id, pi.level, pi.is_equipped, i.*
                FROM player_items pi JOIN items i ON pi.item_id=i.id
-               WHERE pi.id=? AND pi.user_id=?""",
+               WHERE pi.id=%s AND pi.user_id=%s""",
             (item_id, str(ctx.author.id))
         ).fetchone()
         conn.close()
@@ -112,7 +112,7 @@ class Items(commands.Cog):
             color=color
         )
         embed.add_field(name="Type",    value=row["type"].capitalize(), inline=True)
-        embed.add_field(name="Rarity",  value=RARITY_LABEL.get(row["rarity"],"?"), inline=True)
+        embed.add_field(name="Rarity",  value=RARITY_LABEL.get(row["rarity"],"%s"), inline=True)
         embed.add_field(name="Level",   value=str(lv), inline=True)
         if atk:  embed.add_field(name="⚔️ ATK Bonus", value=f"+{atk}", inline=True)
         if def_: embed.add_field(name="🛡️ DEF Bonus", value=f"+{def_}", inline=True)
@@ -132,7 +132,7 @@ class Items(commands.Cog):
         conn = db.get_conn()
         # Verify warrior belongs to player
         pc = conn.execute(
-            "SELECT pc.id, ch.name FROM player_characters pc JOIN characters ch ON pc.char_id=ch.id WHERE pc.id=? AND pc.user_id=?",
+            "SELECT pc.id, ch.name FROM player_characters pc JOIN characters ch ON pc.char_id=ch.id WHERE pc.id=%s AND pc.user_id=%s",
             (char_id, str(ctx.author.id))
         ).fetchone()
         if not pc:
@@ -142,7 +142,7 @@ class Items(commands.Cog):
 
         # Verify item belongs to player
         pi = conn.execute(
-            "SELECT pi.id, i.name, i.type FROM player_items pi JOIN items i ON pi.item_id=i.id WHERE pi.id=? AND pi.user_id=?",
+            "SELECT pi.id, i.name, i.type FROM player_items pi JOIN items i ON pi.item_id=i.id WHERE pi.id=%s AND pi.user_id=%s",
             (item_id, str(ctx.author.id))
         ).fetchone()
         if not pi:
@@ -153,13 +153,13 @@ class Items(commands.Cog):
         # Unequip any existing item of same type on this warrior
         conn.execute(
             """UPDATE player_items SET is_equipped=0, equipped_to=NULL
-               WHERE user_id=? AND equipped_to=? AND item_id IN
-               (SELECT id FROM items WHERE type=?)""",
+               WHERE user_id=%s AND equipped_to=%s AND item_id IN
+               (SELECT id FROM items WHERE type=%s)""",
             (str(ctx.author.id), char_id, pi["type"])
         )
         # Equip new item
         conn.execute(
-            "UPDATE player_items SET is_equipped=1, equipped_to=? WHERE id=?",
+            "UPDATE player_items SET is_equipped=1, equipped_to=%s WHERE id=%s",
             (char_id, item_id)
         )
         conn.commit()
@@ -177,7 +177,7 @@ class Items(commands.Cog):
             return
         conn = db.get_conn()
         pi = conn.execute(
-            "SELECT pi.id, i.name FROM player_items pi JOIN items i ON pi.item_id=i.id WHERE pi.id=? AND pi.user_id=? AND pi.is_equipped=1",
+            "SELECT pi.id, i.name FROM player_items pi JOIN items i ON pi.item_id=i.id WHERE pi.id=%s AND pi.user_id=%s AND pi.is_equipped=1",
             (item_id, str(ctx.author.id))
         ).fetchone()
         if not pi:
@@ -306,7 +306,7 @@ class Items(commands.Cog):
         hatch_time = (datetime.utcnow() + timedelta(hours=egg["hatch_hours"])).isoformat()
         conn.execute("UPDATE players SET hon=hon-%s WHERE user_id=%s", (egg["cost"], str(ctx.author.id)))
         conn.execute(
-            "INSERT INTO player_eggs (user_id, egg_type, hatch_time) VALUES (?,?,?)",
+            "INSERT INTO player_eggs (user_id, egg_type, hatch_time) VALUES (%s,%s,%s)",
             (str(ctx.author.id), egg_type, hatch_time)
         )
         conn.commit()
@@ -334,7 +334,7 @@ class Items(commands.Cog):
 
         conn = db.get_conn()
         eggs = conn.execute(
-            "SELECT * FROM player_eggs WHERE user_id=? AND hatched=0 ORDER BY hatch_time",
+            "SELECT * FROM player_eggs WHERE user_id=%s AND hatched=0 ORDER BY hatch_time",
             (str(ctx.author.id),)
         ).fetchall()
         conn.close()
@@ -380,7 +380,7 @@ class Items(commands.Cog):
         conn = db.get_conn()
         now = datetime.utcnow()
         ready_egg = conn.execute(
-            "SELECT * FROM player_eggs WHERE user_id=? AND hatched=0 AND hatch_time <= ? LIMIT 1",
+            "SELECT * FROM player_eggs WHERE user_id=%s AND hatched=0 AND hatch_time <= %s LIMIT 1",
             (str(ctx.author.id), now.isoformat())
         ).fetchone()
 
@@ -423,7 +423,7 @@ class Items(commands.Cog):
             description=(
                 f"{pet['emoji']} **{pet['name']}** emerged from the egg!\n\n"
                 f"*{pet['description']}*\n\n"
-                f"**Quick! How do you tame it?**\n"
+                f"**Quick! How do you tame it%s**\n"
                 f"Type `pet` to **pet it** 🤝 or `fight` to **fight it** ⚔️\n"
                 f"_(10 seconds to decide!)_"
             ),
@@ -485,7 +485,7 @@ class Items(commands.Cog):
         rows = conn.execute(
             """SELECT pp.id, pp.nickname, pp.is_active, p.*
                FROM player_pets pp JOIN pets p ON pp.pet_id=p.id
-               WHERE pp.user_id=?""",
+               WHERE pp.user_id=%s""",
             (str(ctx.author.id),)
         ).fetchall()
         conn.close()
@@ -516,7 +516,7 @@ class Items(commands.Cog):
             return
         conn = db.get_conn()
         pet_row = conn.execute(
-            "SELECT pp.id, p.name, p.emoji FROM player_pets pp JOIN pets p ON pp.pet_id=p.id WHERE pp.id=? AND pp.user_id=?",
+            "SELECT pp.id, p.name, p.emoji FROM player_pets pp JOIN pets p ON pp.pet_id=p.id WHERE pp.id=%s AND pp.user_id=%s",
             (pet_id, str(ctx.author.id))
         ).fetchone()
         if not pet_row:
