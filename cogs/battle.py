@@ -4,7 +4,6 @@ import random
 import asyncio
 import config
 import database as db
-from cogs.views import BattleAcceptView
 
 def get_player(user_id):
     conn = db.get_conn()
@@ -39,7 +38,7 @@ def get_fighter(user_id):
 
 def ensure_battle_stats(user_id):
     conn = db.get_conn()
-    conn.execute("INSERT INTO battle_stats (user_id) VALUES (%s)", (str(user_id),))
+    conn.execute("INSERT OR IGNORE INTO battle_stats (user_id) VALUES (%s)", (str(user_id),))
     conn.commit()
     conn.close()
 
