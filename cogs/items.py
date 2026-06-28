@@ -296,8 +296,8 @@ class Items(commands.Cog):
         # Max 4 eggs
         conn = db.get_conn()
         egg_count = conn.execute(
-            "SELECT COUNT(*) FROM player_eggs WHERE user_id=? AND hatched=0", (str(ctx.author.id),)
-        ).fetchone()[0]
+            "SELECT COUNT(*) as cnt FROM player_eggs WHERE user_id=%s AND hatched=0", (str(ctx.author.id),)
+        ).fetchone()["cnt"]
         if egg_count >= 4:
             conn.close()
             await ctx.send("❌ You can only hold **4 eggs** at once! Hatch some first with `jay!eggs`.")
