@@ -23,7 +23,7 @@ EGG_TYPES = {
 
 def get_player(user_id):
     conn = db.get_conn()
-    p = conn.execute("SELECT * FROM players WHERE user_id=?", (str(user_id),)).fetchone()
+    p = conn.execute("SELECT * FROM players WHERE user_id=%s", (str(user_id),)).fetchone()
     conn.close()
     return p
 
@@ -184,7 +184,7 @@ class Items(commands.Cog):
             conn.close()
             await ctx.send(f"❌ Item `{item_id}` not found or not equipped.")
             return
-        conn.execute("UPDATE player_items SET is_equipped=0, equipped_to=NULL WHERE id=?", (item_id,))
+        conn.execute("UPDATE player_items SET is_equipped=0, equipped_to=NULL WHERE id=%s", (item_id,))
         conn.commit()
         conn.close()
         await ctx.send(f"✅ **{pi['name']}** unequipped!")
@@ -250,7 +250,7 @@ class Items(commands.Cog):
             return
 
         conn = db.get_conn()
-        item = conn.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
+        item = conn.execute("SELECT * FROM items WHERE id=%s", (item_id,)).fetchone()
         if not item:
             conn.close()
             await ctx.send(f"❌ Item `{item_id}` not found! Check `jay!shop`.")
@@ -260,10 +260,10 @@ class Items(commands.Cog):
             await ctx.send(f"❌ Not enough Hon! Need **{item['cost_hon']:,} 🪙** but you have **{player['hon']:,} 🪙**.")
             return
 
-        conn.execute("UPDATE players SET hon=hon-? WHERE user_id=?", (item["cost_hon"], str(ctx.author.id)))
-        conn.execute("INSERT INTO player_items (user_id, item_id) VALUES (?,?)", (str(ctx.author.id), item_id))
+        conn.execute("UPDATE players SET hon=hon-%s WHERE user_id=%s", (item["cost_hon"], str(ctx.author.id)))
+        conn.execute("INSERT INTO player_items (user_id, item_id) VALUES (%s,%s)", (str(ctx.author.id), item_id))
         conn.commit()
-        new_hon = conn.execute("SELECT hon FROM players WHERE user_id=?", (str(ctx.author.id),)).fetchone()["hon"]
+        new_hon = conn.execute("SELECT hon FROM players WHERE user_id=%s", (str(ctx.author.id),)).fetchone()["hon"]
         conn.close()
 
         r = RARITY_EMOJI.get(item["rarity"], "")
@@ -304,7 +304,7 @@ class Items(commands.Cog):
             return
 
         hatch_time = (datetime.utcnow() + timedelta(hours=egg["hatch_hours"])).isoformat()
-        conn.execute("UPDATE players SET hon=hon-? WHERE user_id=?", (egg["cost"], str(ctx.author.id)))
+        conn.execute("UPDATE players SET hon=hon-%s WHERE user_id=%s", (egg["cost"], str(ctx.author.id)))
         conn.execute(
             "INSERT INTO player_eggs (user_id, egg_type, hatch_time) VALUES (?,?,?)",
             (str(ctx.author.id), egg_type, hatch_time)
@@ -403,7 +403,7 @@ class Items(commands.Cog):
 
         # Map "God" rarity to "L" for DB lookup
         db_rarity = "L" if chosen_rarity == "God" else chosen_rarity
-        pets = conn.execute("SELECT * FROM pets WHERE rarity=?", (db_rarity,)).fetchall()
+        pets = conn.execute("SELECT * FROM pets WHERE rarity=%s", (db_rarity,)).fetchall()
 
         if not pets:
             conn.close()
@@ -442,10 +442,10 @@ class Items(commands.Cog):
 
         # Mark egg as hatched
         conn = db.get_conn()
-        conn.execute("UPDATE player_eggs SET hatched=1 WHERE id=?", (ready_egg["id"],))
+        conn.execute("UPDATE player_eggs SET hatched=1 WHERE id=%s", (ready_egg["id"],))
 
         if chosen == correct:
-            conn.execute("INSERT INTO player_pets (user_id, pet_id) VALUES (?,?)", (str(ctx.author.id), pet["id"]))
+            conn.execute("INSERT INTO player_pets (user_id, pet_id) VALUES (%s,%s)", (str(ctx.author.id), pet["id"]))
             conn.commit()
             conn.close()
             win = discord.Embed(
@@ -524,8 +524,8 @@ class Items(commands.Cog):
             await ctx.send(f"❌ No war animal with ID `{pet_id}`.")
             return
         # Deactivate all, activate selected
-        conn.execute("UPDATE player_pets SET is_active=0 WHERE user_id=?", (str(ctx.author.id),))
-        conn.execute("UPDATE player_pets SET is_active=1 WHERE id=?", (pet_id,))
+        conn.execute("UPDATE player_pets SET is_active=0 WHERE user_id=%s", (str(ctx.author.id),))
+        conn.execute("UPDATE player_pets SET is_active=1 WHERE id=%s", (pet_id,))
         conn.commit()
         conn.close()
         await ctx.send(f"✅ {pet_row['emoji']} **{pet_row['name']}** is now your active War Animal!")
