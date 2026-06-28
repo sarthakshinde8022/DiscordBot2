@@ -4,7 +4,6 @@ import asyncio
 import random
 import config
 import database as db
-from cogs.views import MoveView
 
 def get_player(user_id):
     conn = db.get_conn()
@@ -264,11 +263,14 @@ class Saga(commands.Cog):
                         value=f"`{bar}` Pow:{mv['power']}",
                         inline=True
                     )
-                battle_embed.set_footer(text="Click a move button below • 25 seconds")
-                view = MoveView(fighter, ctx.author.id)
-                await ctx.send(embed=battle_embed, view=view)
-                await view.wait()
-                if view.chosen_move is None:
+                battle_embed.set_footer(text="Type 1, 2, 3, or 4 to attack • 20 seconds")
+                await ctx.send(embed=battle_embed)
+
+                # Wait for move
+                try:
+                    msg = await self.bot.wait_for("message", check=move_check, timeout=20.0)
+                    move_idx = int(msg.content) - 1
+                except asyncio.TimeoutError:
                     self.active_battles.pop(channel_id, None)
                     await ctx.send("⏰ **Battle timed out!** You took too long to choose a move.")
                     return
@@ -320,7 +322,7 @@ class Saga(commands.Cog):
             # Victory!
             conn = db.get_conn()
             conn.execute(
-                "INSERT INTO player_missions (user_id, saga_id, mission_num, completed) VALUES (%s,%s,%s,1) ON CONFLICT (user_id, saga_id, mission_num) DO UPDATE SET completed=1",
+                "INSERT OR REPLACE INTO player_missions (user_id, saga_id, mission_num, completed) VALUES (%s,%s,%s,1)",
                 (str(ctx.author.id), saga["id"], mission["mission_num"])
             )
             conn.execute(
