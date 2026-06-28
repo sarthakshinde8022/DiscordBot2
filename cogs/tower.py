@@ -5,7 +5,6 @@ import random
 from datetime import datetime, timedelta
 import config
 import database as db
-from cogs.views import MoveView
 
 TOWER_LEVELS = {
     1: {"name": "Chaukidar",  "label": "Easy",    "enemies": [
@@ -207,15 +206,16 @@ class Tower(commands.Cog):
                             value=f"`{power_bar(mv['power'])}` {mv['power']}",
                             inline=True
                         )
-                    battle_embed.set_footer(text="Click a move button • 25 seconds")
-                    view = MoveView(fighter, ctx.author.id)
-                    await ctx.send(embed=battle_embed, view=view)
-                    await view.wait()
-                    if view.chosen_move is None:
+                    battle_embed.set_footer(text="Type 1, 2, 3 or 4 • 20 seconds")
+                    await ctx.send(embed=battle_embed)
+
+                    try:
+                        msg = await self.bot.wait_for("message", check=move_check, timeout=20.0)
+                        move_idx = int(msg.content) - 1
+                    except asyncio.TimeoutError:
                         self.active.discard(channel_id)
                         await ctx.send("⏰ Battle timed out!")
                         return
-                    move_idx = view.chosen_move
 
                     chosen = fighter["moves"][move_idx]
                     mult   = element_mult(fighter["element"], eel)
@@ -254,7 +254,7 @@ class Tower(commands.Cog):
         # Record attempt
         conn = db.get_conn()
         conn.execute(
-            "INSERT INTO tower_attempts (user_id, last_attempt) VALUES (%s,%s) ON CONFLICT (user_id) DO UPDATE SET last_attempt=EXCLUDED.last_attempt",
+            "INSERT OR REPLACE INTO tower_attempts (user_id, last_attempt) VALUES (%s,%s)",
             (str(ctx.author.id), datetime.utcnow().isoformat())
         )
         conn.commit()
